@@ -1,0 +1,13 @@
+.git
+.idea
+*.iml
+
+# Runtime TLS and trust material must never enter the build context.
+*.key
+*.pem
+*.crt
+*.cer
+*.p12
+*.pfx
+secrets/
+certs/
