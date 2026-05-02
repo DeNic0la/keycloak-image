@@ -72,14 +72,17 @@ optimization step:
 - `theme-repo-builder` clones a second theme repository and tries to collect
   `dist_keycloak/*.jar` from it
 
-Because `https://github.com/DeNic0la/keycloak-theme-image` currently looks like
-a plain Vite application rather than a finished Keycloakify theme repository,
-that second builder is optional by default. If it does not produce
-`dist_keycloak/*.jar`, the image build continues and only the shadcn starter
-theme is bundled.
+The default second theme repository is
+`https://github.com/DeNic0la/keycloak-theme-image`. Its current source of truth
+is the sibling repo README at `/home/g/repos/keycloak-theme-image/README.md`.
+That repo is a Keycloakify-based Keycloak 26 theme with `login`, `account`, and
+`email` theme scopes. It exposes `pnpm build-keycloak-theme` and is expected to
+emit `dist_keycloak/keycloak-theme-for-kc-all-other-versions.jar`.
 
-Once the repo has a real Keycloakify build script, make it mandatory with build
-arguments like:
+The builder auto-detects the `build-keycloak-theme` script and copies any
+generated `dist_keycloak/*.jar` files. The second theme remains optional by
+default so an unavailable or temporarily broken external theme repo does not
+block image builds. Make it mandatory with build arguments like:
 
 ```bash
 docker build -t secure-keycloak \
