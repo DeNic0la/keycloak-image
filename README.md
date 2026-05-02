@@ -81,14 +81,19 @@ emit `dist_keycloak/keycloak-theme-for-kc-all-other-versions.jar`.
 
 The builder auto-detects the `build-keycloak-theme` script and copies any
 generated `dist_keycloak/*.jar` files. The second theme remains optional by
-default so an unavailable or temporarily broken external theme repo does not
-block image builds. Make it mandatory with build arguments like:
+default, so clone, install, build, or packaging failures in that external repo
+do not block image builds. Make it mandatory with build arguments like:
 
 ```bash
 docker build -t secure-keycloak \
   --build-arg THEME_REPO_OPTIONAL=false \
   --build-arg THEME_REPO_BUILD_CMD="pnpm run build-keycloak-theme" .
 ```
+
+For reproducible CI builds, both external theme repositories are pinned to
+known-good commits by default. Override `THEME_REPO_COMMIT` or
+`SHADCN_THEME_REPO_COMMIT` only when intentionally updating those upstream
+dependencies.
 
 Available build arguments:
 
@@ -98,10 +103,12 @@ Available build arguments:
 - `THEME_REPO_OPTIONAL`
 - `THEME_REPO_URL`
 - `THEME_REPO_REF`
+- `THEME_REPO_COMMIT`
 - `THEME_REPO_BUILD_CMD`
 - `SHADCN_THEME_ENABLED`
 - `SHADCN_THEME_REPO_URL`
 - `SHADCN_THEME_REPO_REF`
+- `SHADCN_THEME_REPO_COMMIT`
 - `SMS_AUTHENTICATOR_ENABLED`
 - `SMS_AUTHENTICATOR_VERSION`
 - `SMS_AUTHENTICATOR_SHA256`

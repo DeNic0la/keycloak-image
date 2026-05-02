@@ -28,6 +28,7 @@ ARG THEME_REPO_ENABLED=true
 ARG THEME_REPO_OPTIONAL=true
 ARG THEME_REPO_URL=https://github.com/DeNic0la/keycloak-theme-image.git
 ARG THEME_REPO_REF=main
+ARG THEME_REPO_COMMIT=75fcbdfb5179ca51cabb6336138aa355055b4d42
 ARG THEME_REPO_BUILD_CMD=
 
 WORKDIR /work
@@ -40,36 +41,45 @@ RUN set -eux; \
     if [ "${THEME_REPO_ENABLED}" != "true" ]; then \
         exit 0; \
     fi; \
-    git clone --depth 1 --branch "${THEME_REPO_REF}" "${THEME_REPO_URL}" /work/theme; \
-    cd /work/theme; \
-    if [ -f pnpm-lock.yaml ]; then \
-        pnpm install --frozen-lockfile; \
-    elif [ -f yarn.lock ]; then \
-        yarn install --frozen-lockfile; \
-    elif [ -f package-lock.json ]; then \
-        npm ci; \
-    elif [ -f package.json ]; then \
-        npm install; \
-    fi; \
-    if [ -n "${THEME_REPO_BUILD_CMD}" ]; then \
-        sh -lc "${THEME_REPO_BUILD_CMD}"; \
-    elif [ -f package.json ] && grep -q '"build-keycloak-theme"' package.json; then \
-        if [ -f pnpm-lock.yaml ]; then \
-            pnpm run build-keycloak-theme; \
-        elif [ -f yarn.lock ]; then \
-            yarn build-keycloak-theme; \
-        else \
-            npm run build-keycloak-theme; \
-        fi; \
-    fi; \
-    if [ -d dist_keycloak ] && find dist_keycloak -maxdepth 1 -name '*.jar' | grep -q .; then \
+    if git clone --depth 1 --branch "${THEME_REPO_REF}" "${THEME_REPO_URL}" /work/theme && \
+        cd /work/theme && \
+        { [ -z "${THEME_REPO_COMMIT}" ] || { \
+            git fetch --depth 1 origin "${THEME_REPO_COMMIT}" && \
+            git checkout --detach FETCH_HEAD; \
+        }; } && \
+        { \
+            if [ -f pnpm-lock.yaml ]; then \
+                pnpm install --frozen-lockfile; \
+            elif [ -f yarn.lock ]; then \
+                yarn install --frozen-lockfile; \
+            elif [ -f package-lock.json ]; then \
+                npm ci; \
+            elif [ -f package.json ]; then \
+                npm install; \
+            fi; \
+        } && \
+        { \
+            if [ -n "${THEME_REPO_BUILD_CMD}" ]; then \
+                sh -lc "${THEME_REPO_BUILD_CMD}"; \
+            elif [ -f package.json ] && grep -q '"build-keycloak-theme"' package.json; then \
+                if [ -f pnpm-lock.yaml ]; then \
+                    pnpm run build-keycloak-theme; \
+                elif [ -f yarn.lock ]; then \
+                    yarn build-keycloak-theme; \
+                else \
+                    npm run build-keycloak-theme; \
+                fi; \
+            fi; \
+        } && \
+        [ -d dist_keycloak ] && \
+        find dist_keycloak -maxdepth 1 -name '*.jar' | grep -q .; then \
         cp dist_keycloak/*.jar /out/providers/; \
     elif [ "${THEME_REPO_OPTIONAL}" != "true" ]; then \
         echo "No Keycloak theme JAR was produced by ${THEME_REPO_URL}."; \
-        echo "Set THEME_REPO_BUILD_CMD to your theme build command or make the repo emit dist_keycloak/*.jar."; \
+        echo "Set THEME_REPO_BUILD_CMD to your theme build command or make the repo clone, build, and emit dist_keycloak/*.jar."; \
         exit 1; \
     else \
-        echo "Skipping optional theme repo ${THEME_REPO_URL}: no dist_keycloak/*.jar output."; \
+        echo "Skipping optional theme repo ${THEME_REPO_URL}: clone, install, build, or packaging failed."; \
     fi
 
 FROM ${NODE_IMAGE} AS shadcn-theme-builder
@@ -77,6 +87,7 @@ FROM ${NODE_IMAGE} AS shadcn-theme-builder
 ARG SHADCN_THEME_ENABLED=true
 ARG SHADCN_THEME_REPO_URL=https://github.com/Oussemasahbeni/keycloakify-shadcn-starter.git
 ARG SHADCN_THEME_REPO_REF=main
+ARG SHADCN_THEME_REPO_COMMIT=f4f9c78e4741c3f4a263c009387b64f36cd07b06
 
 WORKDIR /work
 
@@ -90,6 +101,10 @@ RUN set -eux; \
     fi; \
     git clone --depth 1 --branch "${SHADCN_THEME_REPO_REF}" "${SHADCN_THEME_REPO_URL}" /work/theme; \
     cd /work/theme; \
+    if [ -n "${SHADCN_THEME_REPO_COMMIT}" ]; then \
+        git fetch --depth 1 origin "${SHADCN_THEME_REPO_COMMIT}"; \
+        git checkout --detach FETCH_HEAD; \
+    fi; \
     if [ -f pnpm-lock.yaml ]; then \
         pnpm install --frozen-lockfile; \
         pnpm run build-keycloak-theme; \
