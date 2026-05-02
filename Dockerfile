@@ -1,6 +1,27 @@
 ARG KEYCLOAK_VERSION=26.6.1
 ARG NODE_IMAGE=node:22-alpine
 
+FROM alpine:3.21 AS sms-authenticator-provider
+
+ARG SMS_AUTHENTICATOR_ENABLED=true
+ARG SMS_AUTHENTICATOR_VERSION=v26.6.1
+ARG SMS_AUTHENTICATOR_SHA256=c2d4ceb3f2b1f14392f6e468b1d922081d12971bc9efe50113759d2e52686dd7
+
+WORKDIR /work
+
+RUN apk add --no-cache ca-certificates curl
+RUN mkdir -p /out/providers
+
+RUN set -eux; \
+    if [ "${SMS_AUTHENTICATOR_ENABLED}" != "true" ]; then \
+        exit 0; \
+    fi; \
+    SMS_AUTHENTICATOR_JAR="netzbegruenung.sms-authenticator-${SMS_AUTHENTICATOR_VERSION}.jar"; \
+    curl -fsSL \
+        "https://github.com/netzbegruenung/keycloak-mfa-plugins/releases/download/${SMS_AUTHENTICATOR_VERSION}/${SMS_AUTHENTICATOR_JAR}" \
+        -o "/out/providers/${SMS_AUTHENTICATOR_JAR}"; \
+    echo "${SMS_AUTHENTICATOR_SHA256}  /out/providers/${SMS_AUTHENTICATOR_JAR}" | sha256sum -c -
+
 FROM ${NODE_IMAGE} AS theme-repo-builder
 
 ARG THEME_REPO_ENABLED=true
@@ -94,6 +115,7 @@ WORKDIR /opt/keycloak
 
 COPY --from=theme-repo-builder /out/providers/ /opt/keycloak/providers/
 COPY --from=shadcn-theme-builder /out/providers/ /opt/keycloak/providers/
+COPY --from=sms-authenticator-provider /out/providers/ /opt/keycloak/providers/
 
 RUN /opt/keycloak/bin/kc.sh build
 

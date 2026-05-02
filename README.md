@@ -11,6 +11,10 @@ It now also supports bundling custom themes during the image build:
 - an additional theme repository, defaulting to
   `https://github.com/DeNic0la/keycloak-theme-image`
 
+The image also bundles the SMS authenticator from
+`https://github.com/netzbegruenung/keycloak-mfa-plugins` so realms can add SMS
+OTP as a second authentication factor.
+
 It follows the official Keycloak guidance for:
 
 - optimized container builds:
@@ -95,6 +99,80 @@ Available build arguments:
 - `SHADCN_THEME_ENABLED`
 - `SHADCN_THEME_REPO_URL`
 - `SHADCN_THEME_REPO_REF`
+- `SMS_AUTHENTICATOR_ENABLED`
+- `SMS_AUTHENTICATOR_VERSION`
+- `SMS_AUTHENTICATOR_SHA256`
+
+## SMS MFA provider
+
+The Dockerfile downloads the SMS authenticator release JAR from
+`netzbegruenung/keycloak-mfa-plugins`, verifies its SHA-256 digest, and copies it
+into `/opt/keycloak/providers/` before `kc.sh build`.
+
+Defaults:
+
+- `SMS_AUTHENTICATOR_ENABLED=true`
+- `SMS_AUTHENTICATOR_VERSION=v26.6.1`
+- `SMS_AUTHENTICATOR_SHA256=c2d4ceb3f2b1f14392f6e468b1d922081d12971bc9efe50113759d2e52686dd7`
+
+Keep this plugin version aligned with the Keycloak version whenever possible.
+Changing the plugin JAR is a compatibility-relevant image change, so validate the
+rollout strategy with Keycloak's `update-compatibility` flow before production
+rollouts.
+
+### Realm setup
+
+After deploying the image, configure each realm that should use SMS MFA:
+
+1. Go to `Realm` > `Authentication` > `Required actions`.
+2. Enable `Phone Validation` and `Update Mobile Number`.
+3. Duplicate the built-in `Browser` authentication flow, for example as
+   `browser_sms_flow`.
+4. In the copied flow, add the `SMS Authentication (2FA)` authenticator.
+5. Name the authenticator execution alias `sms-2fa`.
+6. Set the execution to `Required` when every login must use SMS MFA, or
+   `Alternative` when it should sit beside another second factor such as OTP.
+7. Open the flow actions and bind the copied flow as the realm `Browser flow`.
+
+The Medium walkthrough removes the copied `Conditional OTP` form and marks the
+SMS step as required when SMS MFA should apply to all users in the realm. Keep
+that behavior only if SMS is intended to be mandatory for the whole browser
+login flow.
+
+### SMS provider configuration
+
+Configure the `sms-2fa` execution for the HTTP API of the SMS provider used by
+the deployment. The plugin sends the SMS request as an HTTP POST and exposes
+generic fields for common SMS APIs:
+
+- `SMS API URL`
+- `URL encode data`
+- `Put API Secret Token in Authorization Header`
+- `API Secret Token Attribute`
+- `API Secret`
+- `Basic Auth Username`
+- `Message Attribute`
+- `Receiver Phone Number Attribute`
+- `Sender Phone Number Attribute`
+- `SenderId`
+- `Use message UUID`
+- `UUID attribute`
+- `Request JSON template`
+
+SMS API credentials, tokens, provider URLs, sender IDs, and role exclusions are
+realm or deployment configuration. Do not bake them into this image.
+
+For local or non-production testing, enable the authenticator's simulation mode.
+In that mode no real SMS is sent and the OTP can be read from Keycloak server
+logs. Disable simulation mode before production use.
+
+Users can register or update their phone number in the account console under
+`/realms/<realm>/account/#/account-security/signing-in`. On first login after
+SMS MFA is required, users without a phone number are prompted to add and verify
+one before completing login.
+
+SMS OTP is weaker than WebAuthn or authenticator-app OTP. Use it only when the
+realm's risk model accepts SMS as a second factor.
 
 ## CI and publishing
 
@@ -165,9 +243,9 @@ change.
 
 ## Provider configuration
 
-This image does not ship custom provider implementation JARs and does not
-hardcode SPI overrides beyond the normal image-level settings for database
-vendor, health, and metrics.
+This image ships the SMS authenticator provider JAR from
+`netzbegruenung/keycloak-mfa-plugins`. It does not hardcode SPI overrides beyond
+the normal image-level settings for database vendor, health, and metrics.
 
 That is intentional:
 
@@ -180,7 +258,7 @@ That is intentional:
 
 Current provider posture for this image:
 
-- no custom provider implementations
+- SMS Authentication (2FA) provider is baked into the optimized image
 - custom theme JARs may be baked into the image during the Docker build
 - no provider-specific build-time SPI overrides
 - provider-specific runtime overrides are expected to live in the deployment
