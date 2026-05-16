@@ -129,12 +129,11 @@ ENV KC_DB=postgres
 WORKDIR /opt/keycloak
 
 COPY --from=theme-repo-builder /out/providers/ /opt/keycloak/providers/
-COPY --from=shadcn-theme-builder /out/providers/ /opt/keycloak/providers/
 COPY --from=sms-authenticator-provider /out/providers/ /opt/keycloak/providers/
 
 RUN /opt/keycloak/bin/kc.sh build
 
-FROM quay.io/keycloak/keycloak:${KEYCLOAK_VERSION}
+FROM quay.io/keycloak/keycloak:${KEYCLOAK_VERSION} as final
 
 COPY --from=builder /opt/keycloak/ /opt/keycloak/
 
